@@ -125,7 +125,8 @@ Consistency Policy : resync
        3       8       64        3      active sync set-B   /dev/sde
 ```
 
-### 3.1 Сломала RAID
+### 3 Сломать и починить RAID
+#### 3.1 Сломала RAID
 ```
 root@otus-homework:~# mdadm /dev/md0 --remove /dev/sdc
 mdadm: hot removed /dev/sdc from /dev/md0
@@ -165,7 +166,7 @@ Consistency Policy : resync
 
 ```
 
-### 3.2 Починила RAID
+#### 3.2 Починила RAID
 ```
 root@otus-homework:~# mdadm /dev/md0 --add /dev/sdc
 mdadm: added /dev/sdc
@@ -212,10 +213,9 @@ Consistency Policy : resync
        4       8       32        1      spare rebuilding   /dev/sdc
        2       8       48        2      active sync set-A   /dev/sdd
        3       8       64        3      active sync set-B   /dev/sde
-
 ```
 
-### 3.3 Подождала пока завершится синхронизация
+#### 3.3 Подождала пока завершится синхронизация
 ```
 root@otus-homework:~# cat /proc/mdstat
 Personalities : [raid0] [raid1] [raid4] [raid5] [raid6] [raid10] [linear] 
@@ -223,5 +223,122 @@ md0 : active raid10 sdc[4] sde[3] sdd[2] sdb[0]
       41908224 blocks super 1.2 512K chunks 2 near-copies [4/4] [UUUU]
       
 unused devices: <none>
+```
 
+### 4 Создать GPT таблице, раздели и смонтировать
+
+#### 4.1 Создала раздел gpt на RAID
+```
+root@otus-homework:~# parted -s /dev/md0 mklabel gpt
+```
+#### 4.2 Создала партиции
+```
+root@otus-homework:~# parted /dev/md0 mkpart primary ext4 0% 20%
+Information: You may need to update /etc/fstab.
+
+root@otus-homework:~# parted /dev/md0 mkpart primary ext4 20% 40%         
+Information: You may need to update /etc/fstab.
+
+root@otus-homework:~# parted /dev/md0 mkpart primary ext4 40% 80%        
+Information: You may need to update /etc/fstab.
+
+root@otus-homework:~# parted /dev/md0 mkpart primary ext4 80% 100%       
+Information: You may need to update /etc/fstab.
+
+```
+
+#### 4.3 Создала на них файловую систему и примонтировала 
+Создала файловую систему
+```
+root@otus-homework:~# for i in $(seq 1 4); do mkfs.ext4 /dev/md0p$i; 
+> done
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 2095104 4k blocks and 524288 inodes
+Filesystem UUID: 6fbfb427-392e-4db4-ba39-a9095ffc48ea
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 2095360 4k blocks and 524288 inodes
+Filesystem UUID: 920dcd08-4d6a-4914-8fbe-0546725afc05
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 4190976 4k blocks and 1048576 inodes
+Filesystem UUID: 5a6563ed-88fc-4d7d-b993-7b3394ef93f8
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632, 2654208, 
+	4096000
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done   
+
+mke2fs 1.47.0 (5-Feb-2023)
+Discarding device blocks: done                            
+Creating filesystem with 2095104 4k blocks and 524288 inodes
+Filesystem UUID: fddc06ed-50f2-45a2-8a6d-6b876dee0080
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+```
+Создала каталоги
+```
+mkdir -p /raid/part{1,2,3,4}
+```
+
+Примонтировала 
+```
+for i in $(seq 1 4); do mount /dev/md0p$i /raid/part$i; done
+
+root@otus-homework:/# lsblk
+NAME      MAJ:MIN RM  SIZE RO TYPE   MOUNTPOINTS
+sda         8:0    0   16G  0 disk   
+├─sda1      8:1    0    1M  0 part   
+├─sda2      8:2    0  100M  0 part   /boot/efi
+└─sda3      8:3    0 15.9G  0 part   /
+sdb         8:16   0   20G  0 disk   
+└─md0       9:0    0   40G  0 raid10 
+  ├─md0p1 259:2    0    8G  0 part   /raid/part1
+  ├─md0p2 259:3    0    8G  0 part   /raid/part2
+  ├─md0p3 259:6    0   16G  0 part   /raid/part3
+  └─md0p4 259:7    0    8G  0 part   /raid/part4
+sdc         8:32   0   20G  0 disk   
+└─md0       9:0    0   40G  0 raid10 
+  ├─md0p1 259:2    0    8G  0 part   /raid/part1
+  ├─md0p2 259:3    0    8G  0 part   /raid/part2
+  ├─md0p3 259:6    0   16G  0 part   /raid/part3
+  └─md0p4 259:7    0    8G  0 part   /raid/part4
+sdd         8:48   0   20G  0 disk   
+└─md0       9:0    0   40G  0 raid10 
+  ├─md0p1 259:2    0    8G  0 part   /raid/part1
+  ├─md0p2 259:3    0    8G  0 part   /raid/part2
+  ├─md0p3 259:6    0   16G  0 part   /raid/part3
+  └─md0p4 259:7    0    8G  0 part   /raid/part4
+sde         8:64   0   20G  0 disk   
+└─md0       9:0    0   40G  0 raid10 
+  ├─md0p1 259:2    0    8G  0 part   /raid/part1
+  ├─md0p2 259:3    0    8G  0 part   /raid/part2
+  ├─md0p3 259:6    0   16G  0 part   /raid/part3
+  └─md0p4 259:7    0    8G  0 part   /raid/part4
 ```
