@@ -304,12 +304,12 @@ Writing superblocks and filesystem accounting information: done
 ```
 Создала каталоги
 ```
-mkdir -p /raid/part{1,2,3,4}
+root@otus-homework:~# mkdir -p /raid/part{1,2,3,4}
 ```
 
 Примонтировала 
 ```
-for i in $(seq 1 4); do mount /dev/md0p$i /raid/part$i; done
+root@otus-homework:~# for i in $(seq 1 4); do mount /dev/md0p$i /raid/part$i; done
 
 root@otus-homework:/# lsblk
 NAME      MAJ:MIN RM  SIZE RO TYPE   MOUNTPOINTS
